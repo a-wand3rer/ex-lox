@@ -24,6 +24,25 @@ defmodule Exlox.Scanner do
     ?/ => :slash
   }
 
+  @keywords_map %{
+    "and" => :and,
+    "class" => :class,
+    "else" => :else,
+    "false" => false,
+    "for" => :for,
+    "fun" => :fun,
+    "if" => :if,
+    "nil" => nil,
+    "or" => :or,
+    "print" => :print,
+    "return" => :return,
+    "super" => :super,
+    "this" => :this,
+    "true" => true,
+    "var" => :var,
+    "while" => :while
+  }
+
   defstruct tokens: [], errors: [], line: 1
 
   defguardp is_whitespace(c) when c in [?\s, ?\r, ?\t]
@@ -48,61 +67,61 @@ defmodule Exlox.Scanner do
   def scan(scanner, text) do
     case text do
       [?( | rest] ->
-        add_token(scanner, ?(, rest)
+        add_single_char_token(scanner, ?(, rest)
 
       [?) | rest] ->
-        add_token(scanner, ?), rest)
+        add_single_char_token(scanner, ?), rest)
 
       [?{ | rest] ->
-        add_token(scanner, ?{, rest)
+        add_single_char_token(scanner, ?{, rest)
 
       [?} | rest] ->
-        add_token(scanner, ?}, rest)
+        add_single_char_token(scanner, ?}, rest)
 
       [?, | rest] ->
-        add_token(scanner, ?,, rest)
+        add_single_char_token(scanner, ?,, rest)
 
       [?., c | _] when is_digit(c) ->
         add_number(scanner, text, [], 0)
 
       [?. | rest] ->
-        add_token(scanner, ?., rest)
+        add_single_char_token(scanner, ?., rest)
 
       [?- | rest] ->
-        add_token(scanner, ?-, rest)
+        add_single_char_token(scanner, ?-, rest)
 
       [?+ | rest] ->
-        add_token(scanner, ?+, rest)
+        add_single_char_token(scanner, ?+, rest)
 
       [?; | rest] ->
-        add_token(scanner, ?;, rest)
+        add_single_char_token(scanner, ?;, rest)
 
       [?* | rest] ->
-        add_token(scanner, ?*, rest)
+        add_single_char_token(scanner, ?*, rest)
 
       [?!, ?= | rest] ->
         scanner |> add_token(:bang_equal) |> scan(rest)
 
       [?! | rest] ->
-        add_token(scanner, ?!, rest)
+        add_single_char_token(scanner, ?!, rest)
 
       [?>, ?= | rest] ->
         scanner |> add_token(:greater_equal) |> scan(rest)
 
       [?> | rest] ->
-        add_token(scanner, ?>, rest)
+        add_single_char_token(scanner, ?>, rest)
 
       [?<, ?= | rest] ->
         scanner |> add_token(:less_equal) |> scan(rest)
 
       [?< | rest] ->
-        add_token(scanner, ?<, rest)
+        add_single_char_token(scanner, ?<, rest)
 
       [?=, ?= | rest] ->
         scanner |> add_token(:equal_equal) |> scan(rest)
 
       [?= | rest] ->
-        add_token(scanner, ?=, rest)
+        add_single_char_token(scanner, ?=, rest)
 
       [?/, ?/ | rest] ->
         rest
@@ -110,7 +129,10 @@ defmodule Exlox.Scanner do
         |> then(fn remain -> scan(scanner, remain) end)
 
       [?/ | rest] ->
-        add_token(scanner, ?/, rest)
+        add_single_char_token(scanner, ?/, rest)
+
+      [c | rest] when is_whitespace(c) ->
+        scan(scanner, rest)
 
       [?\n | rest] ->
         scanner |> increase_line() |> scan(rest)
@@ -119,51 +141,53 @@ defmodule Exlox.Scanner do
         add_string(scanner, rest, [])
 
       [c | _] when is_digit(c) ->
-        add_number(scanner, text, [], 0)
+        add_number(scanner, text, [])
 
-      [c | rest] when is_whitespace(c) ->
-        scan(scanner, rest)
+      [c | _] when is_alpha(c) ->
+        add_identifier(scanner, text)
 
       _ ->
         add_error(scanner, "unexpected character")
     end
   end
 
-  def add_number(scanner, [], agg, num_of_dot) do
-    literal =
-      if(num_of_dot > 0, do: agg, else: [?0, ?. | agg])
-      |> Enum.reverse()
-      |> List.to_float()
-
-    scanner
-    |> add_number_token(literal)
-    |> scan([])
-  end
-
-  def add_number(scanner, [?., c | _], [], 0) when is_digit(c) do
-    add_error(scanner, "unexpected character")
-  end
-
-  def add_number(scanner, [?.], _, _), do: add_error(scanner, "unexpected character")
-
-  def add_number(scanner, chars, agg, num_of_dot) do
+  @spec add_identifier(any(), any()) :: nil
+  def add_identifier(scanner, chars, agg \\ []) do
     case chars do
+      [c | rest] when is_alphanumeric(c) ->
+        add_identifier(scanner, rest, [c | agg])
+    end
+  end
+
+  def add_number(scanner, chars, agg, has_dot \\ false) do
+    case chars do
+      [?., c | _] when is_digit(c) and agg == [] ->
+        add_error(scanner, "unexpected character")
+
+      [?.] ->
+        add_error(scanner, "unexpected character")
+
       [c | rest] when is_digit(c) ->
-        add_number(scanner, rest, [c | agg], num_of_dot)
+        add_number(scanner, rest, [c | agg], has_dot)
 
       [?., d | rest] when is_digit(d) ->
-        add_number(scanner, rest, [d, ?. | agg], num_of_dot + 1)
+        add_number(scanner, rest, [d, ?. | agg], true)
+
+      [c | _] when not is_digit(c) ->
+        scanner
+        |> add_number_token(to_number(agg, has_dot))
+        |> scan(chars)
 
       [?\n | rest] ->
-        literal =
-          if(num_of_dot > 0, do: agg, else: [?0 | [?. | agg]])
-          |> Enum.reverse()
-          |> List.to_float()
-
         scanner
-        |> add_number_token(literal)
+        |> add_number_token(to_number(agg, has_dot))
         |> increase_line()
         |> scan(rest)
+
+      [] ->
+        scanner
+        |> add_number_token(to_number(agg, has_dot))
+        |> scan([])
     end
   end
 
@@ -196,7 +220,7 @@ defmodule Exlox.Scanner do
     %Scanner{scanner | tokens: [Token.new(:number, scanner.line, literal) | scanner.tokens]}
   end
 
-  def add_token(scanner, char, rest) do
+  def add_single_char_token(scanner, char, rest) do
     scanner
     |> add_token(Map.get(@single_char_token_map, char))
     |> scan(rest)
@@ -216,5 +240,16 @@ defmodule Exlox.Scanner do
   @spec increase_line(Scanner.t()) :: Scanner.t()
   def increase_line(scanner) do
     %Scanner{scanner | line: scanner.line + 1}
+  end
+
+  @spec to_number(charlist(), boolean()) :: float()
+  def to_number(chars, has_dot) do
+    if has_dot do
+      chars
+    else
+      [?0, ?. | chars]
+    end
+    |> Enum.reverse()
+    |> List.to_float()
   end
 end
