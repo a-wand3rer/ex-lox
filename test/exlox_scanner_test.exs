@@ -1,4 +1,5 @@
 defmodule ExloxScannerTest do
+  alias Exlox.ScanError
   alias Exlox.Token
   alias Exlox.Scanner
   use ExUnit.Case
@@ -61,7 +62,8 @@ defmodule ExloxScannerTest do
     assert Scanner.scan_tokens("\"hello\nworld\"") ==
              {:ok, [%Token{type: :string, line: 1, literal: "helloworld"}]}
 
-    assert Scanner.scan_tokens("\"Abc") == {:error, ["unterminated string"]}
+    assert Scanner.scan_tokens("\"Abc") ==
+             {:error, [%ScanError{message: "unterminated string", line: 1}]}
   end
 
   test "parse number" do
@@ -85,8 +87,45 @@ defmodule ExloxScannerTest do
                 %Token{type: :number, line: 1, literal: 100.0}
               ]}
 
-    assert Scanner.scan_tokens(".123") == {:error, ["unexpected character"]}
-    assert Scanner.scan_tokens("123.") == {:error, ["unexpected character"]}
-    assert Scanner.scan_tokens("123.3.") == {:error, ["unexpected character"]}
+    assert Scanner.scan_tokens(".123") ==
+             {:error, [%ScanError{message: "unexpected character", line: 1, char: "."}]}
+
+    assert Scanner.scan_tokens("123.") ==
+             {:error, [%ScanError{message: "unexpected character", line: 1, char: "."}]}
+
+    assert Scanner.scan_tokens("123.3.") ==
+             {:error, [%ScanError{message: "unexpected character", line: 1, char: "."}]}
+
+    assert Scanner.scan_tokens("123.3.3") ==
+             {:error, [%ScanError{message: "unexpected character", line: 1, char: "."}]}
+  end
+
+  test "parsing identifier" do
+    assert Scanner.scan_tokens("hello") ==
+             {:ok, [%Token{type: :identifier, line: 1, literal: "hello"}]}
+
+    assert Scanner.scan_tokens("hello world") ==
+             {:ok,
+              [
+                %Token{type: :identifier, line: 1, literal: "hello"},
+                %Token{type: :identifier, line: 1, literal: "world"}
+              ]}
+
+    assert Scanner.scan_tokens("hello123\nworld") ==
+             {:ok,
+              [
+                %Token{type: :identifier, line: 1, literal: "hello123"},
+                %Token{type: :identifier, line: 2, literal: "world"}
+              ]}
+
+    assert Scanner.scan_tokens("Hello123\nWorld") ==
+             {:ok,
+              [
+                %Token{type: :identifier, line: 1, literal: "Hello123"},
+                %Token{type: :identifier, line: 2, literal: "World"}
+              ]}
+
+    assert Scanner.scan_tokens("123abc") ==
+             {:error, [%ScanError{message: "unexpected character", line: 1, char: "a"}]}
   end
 end
