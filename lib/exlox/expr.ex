@@ -12,19 +12,52 @@ defmodule Exlox.Expr do
     @type t :: %Binary{
             left: Expr.t(),
             operator: operator(),
-            right: Expr.t(),
-            line: non_neg_integer()
+            right: Expr.t()
           }
 
-    @enforce_keys [:left, :operator, :right, :line]
-    defstruct [:left, :operator, :right, :line]
+    @enforce_keys [:left, :operator, :right]
+    defstruct [:left, :operator, :right]
+
+    @operator_map %{
+      :star => :mul,
+      :slash => :div,
+      :minus => :sub,
+      :plus => :add,
+      :greater => :gt,
+      :greater_equal => :gt_eq,
+      :less => :lt,
+      :less_equal => :lt_eq,
+      :bang_equal => :not_eq,
+      :equal_equal => :eq
+    }
+
+    def new_from_token(left, right, operator) do
+      %Binary{
+        left: left,
+        right: right,
+        operator: Map.get(@operator_map, operator)
+      }
+    end
 
     defimpl Exlox.Print do
       alias Exlox.Print
+
       def ast_print(expr) do
         "(#{operator_to_string(expr.operator)} #{Print.ast_print(expr.left)} #{Print.ast_print(expr.right)})"
       end
 
+      @spec operator_to_string(
+              :add
+              | :div
+              | :eq
+              | :gt
+              | :gt_eq
+              | :lt
+              | :lt_eq
+              | :mul
+              | :not_eq
+              | :sub
+            ) :: nonempty_binary()
       def operator_to_string(op) do
         case op do
           :not_eq -> "!="
@@ -48,6 +81,8 @@ defmodule Exlox.Expr do
     @enforce_keys [:value]
     defstruct [:value]
 
+    def new(v), do: %Literal{value: v}
+
     defimpl Exlox.Print do
       def ast_print(expr) do
         "#{expr.value}"
@@ -66,12 +101,21 @@ defmodule Exlox.Expr do
     @enforce_keys [:prefix, :expr]
     defstruct [:prefix, :expr]
 
-    defimpl Exlox.Print  do
+    @token_type_prefix_map %{
+      :minus => :negative,
+      :bang => :not
+    }
+
+    def new_from_token(type, expr),
+      do: %Unary{prefix: Map.get(@token_type_prefix_map, type), expr: expr}
+
+    defimpl Exlox.Print do
       def ast_print(expr) do
-        prefix_s = case expr.prefix do
-          :not -> "!"
-          :negative -> "-"
-        end
+        prefix_s =
+          case expr.prefix do
+            :not -> "!"
+            :negative -> "-"
+          end
 
         "(#{prefix_s} #{Exlox.Print.ast_print(expr.expr)})"
       end
@@ -84,7 +128,9 @@ defmodule Exlox.Expr do
     @enforce_keys [:expr]
     defstruct [:expr]
 
-    defimpl Exlox.Print  do
+    def new(expr), do: %Grouping{expr: expr}
+
+    defimpl Exlox.Print do
       def ast_print(expr) do
         "(group #{Exlox.Print.ast_print(expr.expr)})"
       end

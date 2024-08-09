@@ -144,7 +144,7 @@ defmodule ExloxScannerTest do
               [
                 %Token{type: :class, line: 1, literal: "class"},
                 %Token{type: :comma, line: 1},
-                %Token{type: :while, line: 2, literal: "while,"},
+                %Token{type: :while, line: 2, literal: "while"},
                 %Token{type: :identifier, line: 3, literal: "Abc123"}
               ]}
   end
