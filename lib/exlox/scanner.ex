@@ -157,17 +157,23 @@ defmodule Exlox.Scanner do
     case chars do
       [] ->
         scanner
-        |> add_token(:identifier, to_string_literal(agg))
+        |> add_identifier_token(to_string_literal(agg))
         |> scan([])
 
       [c | _] when not is_alphanumeric(c) ->
         scanner
-        |> add_token(:identifier, to_string_literal(agg))
+        |> add_identifier_token(to_string_literal(agg))
         |> scan(chars)
 
       [c | rest] when is_alphanumeric(c) ->
         add_identifier(scanner, rest, [c | agg])
     end
+  end
+
+  def add_identifier_token(scanner, literal) do
+    token_type = Map.get(@keywords_map, literal, :identifier)
+    scanner
+    |> add_token(token_type, literal)
   end
 
   def add_number(scanner, chars, agg, has_dot \\ false) do
@@ -226,6 +232,7 @@ defmodule Exlox.Scanner do
     end
   end
 
+  @spec add_string_token(Exlox.Scanner.t(), any()) :: Exlox.Scanner.t()
   def add_string_token(scanner, literal) do
     %Scanner{scanner | tokens: [Token.new(:string, scanner.line, literal) | scanner.tokens]}
   end
@@ -234,6 +241,7 @@ defmodule Exlox.Scanner do
     %Scanner{scanner | tokens: [Token.new(:number, scanner.line, literal) | scanner.tokens]}
   end
 
+  @spec add_single_char_token(Exlox.Scanner.t(), any(), any()) :: {:error, any()} | {:ok, list()}
   def add_single_char_token(scanner, char, rest) do
     scanner
     |> add_token(Map.get(@single_char_token_map, char))
@@ -245,11 +253,12 @@ defmodule Exlox.Scanner do
     %Scanner{scanner | tokens: [Token.new(token_type, scanner.line) | scanner.tokens]}
   end
 
+  @spec add_token(Exlox.Scanner.t(), any(), any()) :: Exlox.Scanner.t()
   def add_token(scanner, token_type, literal) do
     %Scanner{scanner | tokens: [Token.new(token_type, scanner.line, literal) | scanner.tokens]}
   end
 
-  @spec add_error(Scanner.t(), String.t()) :: Scanner.t()
+  @spec add_error(Exlox.Scanner.t(), any()) :: {:error, any()} | {:ok, list()}
   def add_error(scanner, err_msg, char \\ nil) do
     %Scanner{scanner | errors: [ScanError.new(err_msg, scanner.line, char) | scanner.errors]}
     |> scan([])

@@ -98,6 +98,9 @@ defmodule ExloxScannerTest do
 
     assert Scanner.scan_tokens("123.3.3") ==
              {:error, [%ScanError{message: "unexpected character", line: 1, char: "."}]}
+
+    assert Scanner.scan_tokens("123abc") ==
+             {:error, [%ScanError{message: "unexpected character", line: 1, char: "a"}]}
   end
 
   test "parsing identifier" do
@@ -124,8 +127,25 @@ defmodule ExloxScannerTest do
                 %Token{type: :identifier, line: 1, literal: "Hello123"},
                 %Token{type: :identifier, line: 2, literal: "World"}
               ]}
+  end
 
-    assert Scanner.scan_tokens("123abc") ==
-             {:error, [%ScanError{message: "unexpected character", line: 1, char: "a"}]}
+  test "parsing keywords" do
+    assert Scanner.scan_tokens("fun") == {:ok, [%Token{type: :fun, line: 1, literal: "fun"}]}
+
+    assert Scanner.scan_tokens("fun abc") ==
+             {:ok,
+              [
+                %Token{type: :fun, line: 1, literal: "fun"},
+                %Token{type: :identifier, line: 1, literal: "abc"}
+              ]}
+
+    assert Scanner.scan_tokens("class,\nwhile\nAbc123") ==
+             {:ok,
+              [
+                %Token{type: :class, line: 1, literal: "class"},
+                %Token{type: :comma, line: 1},
+                %Token{type: :while, line: 2, literal: "while,"},
+                %Token{type: :identifier, line: 3, literal: "Abc123"}
+              ]}
   end
 end
