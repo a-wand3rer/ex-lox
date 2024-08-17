@@ -1,4 +1,6 @@
 defmodule ExloxParserTest do
+  alias Exlox.Token
+  alias Exlox.Parser.ParserError
   alias ExloxParserTest.TestingCase
   alias Exlox.Parser
   alias Exlox.Scanner
@@ -10,31 +12,43 @@ defmodule ExloxParserTest do
 
   @tag primary: true
   test "parsing primary" do
-    {:ok, tokens} = Scanner.scan_tokens("1")
-    assert Parser.parse_primary(tokens) == {%Literal{value: 1.0}, []}
+    assert Parser.parse_primary(tokenize("1")) == {:ok, %Literal{value: 1.0}, [], nil}
 
-    {:ok, tokens} = Scanner.scan_tokens("(1)")
-    assert Parser.parse_primary(tokens) == {%Grouping{expr: %Literal{value: 1.0}}, []}
+    assert Parser.parse_primary(tokenize("(1)")) ==
+             {:ok, %Grouping{expr: %Literal{value: 1.0}}, [], nil}
+
+    assert Parser.parse_primary(tokenize("(1")) ==
+             {:error,
+              [
+                %Token{type: :left_paren, line: 1},
+                %Token{type: :number, literal: 1.0, line: 1}
+              ], ParserError.missing_terminator()}
+
+    assert Parser.parse_primary(tokenize("+")) ==
+             {:error, [%Token{type: :plus, line: 1}],
+              ParserError.invalid(%Token{type: :plus, line: 1})}
   end
 
   @tag unary: true
   test "parsing unary" do
-    assert Parser.parse_unary(tokenize("(1)")) == {%Grouping{expr: %Literal{value: 1.0}}, []}
+    assert Parser.parse_unary(tokenize("(1)")) == {:ok, %Grouping{expr: %Literal{value: 1.0}}, [], nil}
 
     assert Parser.parse_unary(tokenize("-1")) ==
-             {%Unary{prefix: :negative, expr: %Literal{value: 1.0}}, []}
+             {:ok, %Unary{prefix: :negative, expr: %Literal{value: 1.0}}, [], nil}
 
     assert Parser.parse_unary(tokenize("!1")) ==
-             {%Unary{prefix: :not, expr: %Literal{value: 1.0}}, []}
+             {:ok, %Unary{prefix: :not, expr: %Literal{value: 1.0}}, [], nil}
 
     assert Parser.parse_unary(tokenize("!!1")) ==
-             {%Unary{prefix: :not, expr: %Unary{prefix: :not, expr: %Literal{value: 1.0}}}, []}
+             {:ok, %Unary{prefix: :not, expr: %Unary{prefix: :not, expr: %Literal{value: 1.0}}}, [], nil}
 
     assert Parser.parse_unary(tokenize("!!(1)")) ==
-             {%Unary{
+             {:ok, %Unary{
                 prefix: :not,
                 expr: %Unary{prefix: :not, expr: %Grouping{expr: %Literal{value: 1.0}}}
-              }, []}
+              }, [], nil}
+
+              assert Parser.parse_unary(tokenize("!!+(1")) == {:error, nil, [], %ParserError{}}
   end
 
   @tag factor: true
@@ -93,24 +107,26 @@ defmodule ExloxParserTest do
   @tag term: true
   test "parse term" do
     assert Parser.parse_term(tokenize("1 - 1")) == {
-      %Binary{
-        left: %Literal{value: 1.0},
-        operator: :sub,
-        right: %Literal{value: 1.0}
-      }, []
-    }
+             %Binary{
+               left: %Literal{value: 1.0},
+               operator: :sub,
+               right: %Literal{value: 1.0}
+             },
+             []
+           }
 
     assert Parser.parse_term(tokenize("10 - 2 * 3")) == {
-      %Binary{
-        left: %Literal{value: 10.0},
-        operator: :sub,
-        right: %Binary{
-          left: %Literal{value: 2.0},
-          operator: :mul,
-          right: %Literal{value: 3.0}
-        }
-      }, []
-    }
+             %Binary{
+               left: %Literal{value: 10.0},
+               operator: :sub,
+               right: %Binary{
+                 left: %Literal{value: 2.0},
+                 operator: :mul,
+                 right: %Literal{value: 3.0}
+               }
+             },
+             []
+           }
 
     Parser.parse_term(tokenize("3 - 2 + 1")) == {
       %Binary{
@@ -121,7 +137,8 @@ defmodule ExloxParserTest do
         },
         operator: :add,
         right: %Literal{value: 1.0}
-      }, []
+      },
+      []
     }
 
     Parser.parse_term(tokenize("3 - (2 + 1)")) == {
@@ -129,7 +146,8 @@ defmodule ExloxParserTest do
         left: %Literal{value: 3.0},
         operator: :sub,
         right: %Grouping{expr: %Binary{left: 2.0, operator: :add, right: 1.0}}
-      }, []
+      },
+      []
     }
   end
 
