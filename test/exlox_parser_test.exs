@@ -12,51 +12,62 @@ defmodule ExloxParserTest do
 
   @tag primary: true
   test "parsing primary" do
-    assert Parser.parse_primary(tokenize("1")) == {:ok, %Literal{value: 1.0}, [], nil}
+    assert Parser.parse_primary(tokenize("1")) == {:ok, %Literal{value: 1.0}, []}
 
     assert Parser.parse_primary(tokenize("(1)")) ==
-             {:ok, %Grouping{expr: %Literal{value: 1.0}}, [], nil}
+             {:ok, %Grouping{expr: %Literal{value: 1.0}}, []}
 
     assert Parser.parse_primary(tokenize("(1")) ==
-             {:error,
+             {:error, ParserError.missing_terminator(),
               [
                 %Token{type: :left_paren, line: 1},
                 %Token{type: :number, literal: 1.0, line: 1}
-              ], ParserError.missing_terminator()}
+              ]}
 
     assert Parser.parse_primary(tokenize("+")) ==
-             {:error, [%Token{type: :plus, line: 1}],
-              ParserError.invalid(%Token{type: :plus, line: 1})}
+             {:error, ParserError.invalid(%Token{type: :plus, line: 1}),
+              [%Token{type: :plus, line: 1}]}
   end
 
   @tag unary: true
   test "parsing unary" do
-    assert Parser.parse_unary(tokenize("(1)")) == {:ok, %Grouping{expr: %Literal{value: 1.0}}, [], nil}
+    assert Parser.parse_unary(tokenize("(1)")) ==
+             {:ok, %Grouping{expr: %Literal{value: 1.0}}, []}
 
     assert Parser.parse_unary(tokenize("-1")) ==
-             {:ok, %Unary{prefix: :negative, expr: %Literal{value: 1.0}}, [], nil}
+             {:ok, %Unary{prefix: :negative, expr: %Literal{value: 1.0}}, []}
 
     assert Parser.parse_unary(tokenize("!1")) ==
-             {:ok, %Unary{prefix: :not, expr: %Literal{value: 1.0}}, [], nil}
+             {:ok, %Unary{prefix: :not, expr: %Literal{value: 1.0}}, []}
 
     assert Parser.parse_unary(tokenize("!!1")) ==
-             {:ok, %Unary{prefix: :not, expr: %Unary{prefix: :not, expr: %Literal{value: 1.0}}}, [], nil}
+             {:ok, %Unary{prefix: :not, expr: %Unary{prefix: :not, expr: %Literal{value: 1.0}}},
+              []}
 
     assert Parser.parse_unary(tokenize("!!(1)")) ==
-             {:ok, %Unary{
+             {:ok,
+              %Unary{
                 prefix: :not,
                 expr: %Unary{prefix: :not, expr: %Grouping{expr: %Literal{value: 1.0}}}
-              }, [], nil}
+              }, []}
 
-              assert Parser.parse_unary(tokenize("!!+(1")) == {:error, nil, [], %ParserError{}}
+    assert Parser.parse_unary(tokenize("!!+(1")) == {
+             :error,
+             ParserError.invalid(%Token{type: :plus, line: 1}),
+             [
+               %Token{type: :plus, line: 1},
+               %Token{type: :left_paren, line: 1},
+               %Token{type: :number, line: 1, literal: 1.0}
+             ]
+           }
   end
 
   @tag factor: true
   test "parsing factor" do
-    assert Parser.parse_factor(tokenize("1")) == {%Literal{value: 1.0}, []}
+    assert Parser.parse_factor(tokenize("1")) == {:ok, %Literal{value: 1.0}, []}
 
     assert Parser.parse_factor(tokenize("!!(1)")) ==
-             {%Unary{
+             {:ok, %Unary{
                 prefix: :not,
                 expr: %Unary{prefix: :not, expr: %Grouping{expr: %Literal{value: 1.0}}}
               }, []}

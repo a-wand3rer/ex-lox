@@ -100,14 +100,14 @@ defmodule Exlox.Parser do
       {nil, rest} ->
         {nil, rest}
 
-      {:ok, left_expr, rest, nil} ->
+      {:ok, left_expr, rest} ->
         parse_factor_left(left_expr, rest)
     end
   end
 
   # left here means left-associate. Eg: 2 * 2 * 2 => (2 * 2) * 2
   def parse_factor_left(left_expr, tokens) do
-    dbg({left_expr, tokens})
+    # dbg({left_expr, tokens})
 
     case tokens do
       [%Token{type: t} | rest] when t in [:slash, :star] ->
@@ -121,7 +121,7 @@ defmodule Exlox.Parser do
         end
 
       _ ->
-        {left_expr, tokens}
+        {:ok, left_expr, tokens}
     end
   end
 
@@ -133,7 +133,7 @@ defmodule Exlox.Parser do
         # {expr, rest2} = parse_unary(rest)
         # {Unary.new_from_token(type, expr), rest2}
         case parse_unary(rest) do
-          {:ok, expr, rest, nil} -> {:ok, Unary.new_from_token(type, expr), rest, nil}
+          {:ok, expr, rest} -> {:ok, Unary.new_from_token(type, expr), rest}
           err -> err
         end
 
@@ -147,31 +147,31 @@ defmodule Exlox.Parser do
 
     case token.type do
       :number ->
-        {:ok, Literal.new(token.literal), rest, nil}
+        {:ok, Literal.new(token.literal), rest}
 
       :string ->
-        {:ok, Literal.new(token.literal), rest, nil}
+        {:ok, Literal.new(token.literal), rest}
 
       true ->
-        {:ok, Literal.new(true), rest, nil}
+        {:ok, Literal.new(true), rest}
 
       false ->
-        {:ok, Literal.new(false), rest, nil}
+        {:ok, Literal.new(false), rest}
 
       nil ->
-        {:ok, Literal.new(nil), rest, nil}
+        {:ok, Literal.new(nil), rest}
 
       :left_paren ->
         case parse_expression(rest) do
           {expr, [%Token{type: :right_paren} | the_rest]} ->
-            {:ok, Grouping.new(expr), the_rest, nil}
+            {:ok, Grouping.new(expr), the_rest}
 
           _ ->
-            {:error, [token | rest], ParserError.missing_terminator()}
+            {:error, ParserError.missing_terminator(), [token | rest]}
         end
 
       _ ->
-        {:error, [token | rest], ParserError.invalid(token)}
+        {:error, ParserError.invalid(token), [token | rest]}
     end
   end
 
@@ -184,11 +184,11 @@ defmodule Exlox.Parser do
 
     @spec invalid(Token.t()) :: %Exlox.Parser.ParserError{token: Token.t(), type: :invalid_char}
     def invalid(token), do: %__MODULE__{token: token, type: :invalid_char}
+
     @spec missing_terminator() :: %Exlox.Parser.ParserError{
             token: nil,
             type: :missing_terminator
           }
     def missing_terminator(), do: %__MODULE__{type: :missing_terminator}
-
   end
 end
